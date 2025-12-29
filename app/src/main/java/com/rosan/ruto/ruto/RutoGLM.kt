@@ -18,6 +18,7 @@ import dev.langchain4j.model.openai.OpenAiStreamingChatModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onEach
 import java.io.ByteArrayOutputStream
+import java.io.File
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -85,26 +86,30 @@ val taskPrompt = """
 class RutoGLM(
     private val bigModelSession: BigModelSession,
     private val runtime: RutoRuntime,
-    private val device: DeviceRepo
-) {
+    private val device: DeviceRepo,
     var displayId: Int = Display.DEFAULT_DISPLAY
-
+) {
     var quality: Int = 0
 
     var delayDuration: Duration = 0.5.seconds
 
     constructor(
-        bigModel: BigModel, prompt: String, runtime: RutoRuntime, device: DeviceRepo
+        bigModel: BigModel,
+        prompt: String,
+        runtime: RutoRuntime,
+        device: DeviceRepo,
+        displayId: Int = Display.DEFAULT_DISPLAY
     ) : this(
-        bigModel.openSession(prompt), runtime, device
+        bigModel.openSession(prompt), runtime, device, displayId
     )
 
     constructor(
         model: StreamingChatModel,
         prompt: String,
         runtime: RutoRuntime,
-        device: DeviceRepo
-    ) : this(BigModel(model), prompt, runtime, device)
+        device: DeviceRepo,
+        displayId: Int = Display.DEFAULT_DISPLAY
+    ) : this(BigModel(model), prompt, runtime, device, displayId)
 
     constructor(
         modelUrl: String,
@@ -112,7 +117,8 @@ class RutoGLM(
         apiKey: String,
         prompt: String,
         runtime: RutoRuntime,
-        device: DeviceRepo
+        device: DeviceRepo,
+        displayId: Int = Display.DEFAULT_DISPLAY
     ) : this(
         OpenAiStreamingChatModel.builder()
             .baseUrl(modelUrl)
@@ -123,17 +129,21 @@ class RutoGLM(
             .topP(0.85)
             .frequencyPenalty(0.2)
             .httpClientBuilder(RetrofitHttpClientBuilderFactory().create())
-            .build(), prompt, runtime, device
+            .build(), prompt, runtime, device, displayId
     )
 
-    private fun capture(): ImageContent {
-        val bitmap = device.displayManager.capture(displayId).bitmap
+    private fun toImageContent(bitmap: Bitmap?): ImageContent? {
+        if (bitmap == null) return null
 
         val bytes = try {
             val stream = ByteArrayOutputStream()
             val format =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Bitmap.CompressFormat.WEBP_LOSSY
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY
                 else Bitmap.CompressFormat.WEBP
+            File("/data/user/0/com.rosan.ruto/files/a.webp").apply { createNewFile() }
+                .outputStream().use {
+                    bitmap.compress(format, quality, it)
+                }
             bitmap.compress(format, quality, stream)
             stream.toByteArray()
         } finally {
@@ -153,10 +163,11 @@ class RutoGLM(
     suspend fun ruto(
         text: String? = null,
         onStreaming: (think: String) -> Unit = {},
-        onComplete: (think: String) -> Unit = {}
+        onComplete: (think: String) -> Unit = {},
+        onCapture: suspend () -> Bitmap?
     ): String {
         Log.e("r0s", "task $text")
-        val image = capture()
+        val image = toImageContent(onCapture())
         Log.e("r0s", "capture $image")
         Log.e("r0s", "request $image")
         var aiMessage = ""
@@ -177,6 +188,7 @@ class RutoGLM(
         }
 
         val parsed = GLMCommandParser.parse(aiMessage)
+        Log.e("r0s", "parsed ${parsed}")
         if (parsed !is GLMCommandParser.Status.Completed) return ""
         Log.e("r0s", "func ${parsed.command.mapping} : ${parsed.arguments}")
         runtime.registerFunction("finish") {
@@ -185,7 +197,12 @@ class RutoGLM(
         try {
             val result = parsed.callFunction(runtime)
             delay(1000)
-            return ruto(if (result == Unit) "" else result.toString(), onStreaming, onComplete)
+            return ruto(
+                if (result == Unit) "" else result.toString(),
+                onStreaming,
+                onComplete,
+                onCapture
+            )
         } catch (e: RutoFinishException) {
             return ""
         } finally {

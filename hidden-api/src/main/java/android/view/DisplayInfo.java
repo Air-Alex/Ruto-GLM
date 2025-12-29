@@ -14,6 +14,8 @@ public final class DisplayInfo implements Parcelable {
 
     public int logicalHeight;
 
+    public int logicalDensityDpi;
+
     public int rotation;
 
     public int flags;

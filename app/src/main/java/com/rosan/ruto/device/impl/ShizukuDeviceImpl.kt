@@ -9,13 +9,23 @@ import com.rosan.ruto.service.IActivityManager
 import com.rosan.ruto.service.IDisplayManager
 import com.rosan.ruto.service.IImeManager
 import com.rosan.ruto.service.IInputManager
+import com.rosan.ruto.service.IPackageManager
 import com.rosan.ruto.service.ImeManagerService
 import com.rosan.ruto.service.InputManagerService
+import com.rosan.ruto.service.PackageManagerService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 
 class ShizukuDeviceImpl(context: Context) : DeviceRepo {
     private val shizuku = ShizukuServiceManager()
+
+    override val packageManager: IPackageManager by lazy {
+        runBlocking {
+            shizuku.serviceBinder(PackageManagerService::class.java) {
+                IPackageManager.Stub.asInterface(it)
+            }
+        }
+    }
 
     override val activityManager: IActivityManager by lazy {
         runBlocking {
@@ -39,10 +49,6 @@ class ShizukuDeviceImpl(context: Context) : DeviceRepo {
 
     override val imeManager: IImeManager by lazy {
         ImeManagerService(context, shizuku)
-    }
-
-    override suspend fun waitMillis(millis: Long) {
-        delay(millis)
     }
 
     override fun close() {

@@ -7,7 +7,7 @@ import androidx.annotation.RequiresApi;
 
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 public class DisplayControl {
-    public static IBinder createDisplay(String name, boolean secure) {
+    public static IBinder createVirtualDisplay(String name, boolean secure) {
         return null;
     }
 

@@ -26,10 +26,10 @@ class DefaultRutoRuntime(
             swipe(arg(0), arg(1), arg(2), arg(3))
         }
         registerFunction("back") {
-            device.inputManager.clickBack()
+            device.inputManager.clickBack(displayId)
         }
         registerFunction("home") {
-            device.inputManager.clickHome()
+            device.inputManager.clickHome(displayId)
         }
 
         registerFunction("text") {
@@ -54,25 +54,25 @@ class DefaultRutoRuntime(
         get() = displayManager.getDisplayInfo(displayId)
 
     private fun launch(name: String) {
-        device.activityManager.startLabel(name)
+        device.activityManager.startLabel(name, displayId)
     }
 
     private fun click(xt: Float, yt: Float) {
         val x = xt * displayInfo.logicalWidth / 1000
         val y = yt * displayInfo.logicalHeight / 1000
-        device.inputManager.click(PointF(x, y))
+        device.inputManager.click(PointF(x, y), displayId)
     }
 
     private fun doubleClick(xt: Float, yt: Float) {
         val x = xt * displayInfo.logicalWidth / 1000
         val y = yt * displayInfo.logicalHeight / 1000
-        device.inputManager.doubleClick(PointF(x, y))
+        device.inputManager.doubleClick(PointF(x, y), displayId)
     }
 
     private fun longClick(xt: Float, yt: Float) {
         val x = xt * displayInfo.logicalWidth / 1000
         val y = yt * displayInfo.logicalHeight / 1000
-        device.inputManager.longClick(PointF(x, y))
+        device.inputManager.longClick(PointF(x, y), displayId)
     }
 
     private fun swipe(x1t: Float, y1t: Float, x2t: Float, y2t: Float) {
@@ -80,6 +80,6 @@ class DefaultRutoRuntime(
         val y1 = y1t * displayInfo.logicalHeight / 1000
         val x2 = x2t * displayInfo.logicalWidth / 1000
         val y2 = y2t * displayInfo.logicalHeight / 1000
-        device.inputManager.swipe(PointF(x1, y1), PointF(x2, y2))
+        device.inputManager.swipe(PointF(x1, y1), PointF(x2, y2), displayId)
     }
 }

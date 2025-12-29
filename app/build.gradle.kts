@@ -77,6 +77,8 @@ dependencies {
 
     implementation(libs.compose.materialIcons)
 
+    implementation(libs.androidx.compose.navigation)
+
     implementation(libs.lsposed.hiddenapibypass)
 
     annotationProcessor(libs.rikka.refine.annotation.processor)
@@ -85,6 +87,7 @@ dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.android)
+    implementation(libs.koin.compose)
 
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)

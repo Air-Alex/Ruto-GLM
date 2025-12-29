@@ -20,6 +20,8 @@ android {
 }
 
 dependencies {
+    compileOnly(project(":hidden-api"))
+
     compileOnly(libs.annotation)
     runtimeOnly(libs.annotation)
 
@@ -29,6 +31,7 @@ dependencies {
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.android)
+    implementation(libs.koin.compose)
 
     implementation(libs.lsposed.hiddenapibypass)
 
