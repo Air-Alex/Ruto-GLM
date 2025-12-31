@@ -1,24 +1,26 @@
 package com.rosan.installer.ext.process
 
+import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.os.Build
 import android.system.Os
 import androidx.annotation.Keep
 import com.android.server.display.DisplayControl
 import com.rosan.app_process.NewProcess
 import com.rosan.app_process.ParcelableBinder
-import com.rosan.installer.ext.util.parcelable
+import com.rosan.app_process.ProcessManager
 import com.rosan.installer.ext.util.process.ProcessUtil
 import dalvik.system.PathClassLoader
-import kotlin.system.exitProcess
+import java.io.File
 
 internal class ShizukuProcess @Keep constructor() :
     IShizukuProcess.Stub() {
-    private val context by lazy { NewProcess.getUIDContext() }
-
     init {
         val classLoader = this::class.java.classLoader!!
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH")
+
+            @SuppressLint("DiscouragedPrivateApi")
             val parentField = ClassLoader::class.java.getDeclaredField("parent")
             parentField.isAccessible = true
 
@@ -26,6 +28,7 @@ internal class ShizukuProcess @Keep constructor() :
                 PathClassLoader(systemServerClasspath, null, classLoader.parent)
             parentField.set(classLoader, systemServerClassLoader)
 
+            @SuppressLint("BlockedPrivateApi")
             val loadMethod = Runtime::class.java.getDeclaredMethod(
                 "loadLibrary0",
                 Class::class.java,
@@ -36,14 +39,25 @@ internal class ShizukuProcess @Keep constructor() :
 
             parentField.set(classLoader, systemServerClassLoader)
         }
-        ProcessUtil.koin(context)
     }
 
-    override fun destroy() = exitProcess(0)
+    private val context = NewProcess.getUIDContext().also {
+        ProcessUtil.koin(it)
+    }
+
+    private val manager = ProcessManager()
+
+    override fun destroy() {
+        manager.exit(0)
+    }
 
     override fun isAlive(): Boolean = true
 
     override fun serviceBinder(className: String): ParcelableBinder {
-        return ProcessUtil.binder(className, context).parcelable()
+        return manager.serviceBinder(
+            context,
+            this::class.java.classLoader,
+            ComponentName("package", className)
+        )
     }
 }

@@ -12,20 +12,13 @@ import androidx.navigation.navArgument
 import com.rosan.ruto.ui.compose.AppListScreen
 import com.rosan.ruto.ui.compose.GuideScreen
 import com.rosan.ruto.ui.compose.HomeScreen
+import com.rosan.ruto.ui.compose.MultiTaskPreviewScreen
+import com.rosan.ruto.ui.compose.ScreenListScreen
+import com.rosan.ruto.ui.compose.ScreenPreviewScreen
 import com.rosan.ruto.ui.compose.SplashScreen
 import com.rosan.ruto.ui.compose.TaskExecutionScreen
 import com.rosan.ruto.ui.compose.TaskListScreen
 import com.rosan.ruto.ui.compose.TaskPreviewScreen
-
-object Destinations {
-    const val SPLASH = "splash"
-    const val GUIDE = "guide"
-    const val HOME = "home"
-    const val APP_LIST = "app_list"
-    const val TASK_EXECUTION = "task_execution"
-    const val TASK_LIST = "task_list"
-    const val TASK_PREVIEW = "task_preview"
-}
 
 @Composable
 fun NavGraph() {
@@ -47,6 +40,27 @@ fun NavGraph() {
         }
         composable(Destinations.TASK_LIST) {
             TaskListScreen(navController, insets)
+        }
+        composable(Destinations.SCREEN_LIST) {
+            ScreenListScreen(navController, insets)
+        }
+        composable(
+            route = "${Destinations.SCREEN_PREVIEW}/{displayId}",
+            arguments = listOf(
+                navArgument("displayId") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val displayId = backStackEntry.arguments?.getInt("displayId") ?: 0
+            ScreenPreviewScreen(navController, insets, displayId)
+        }
+        composable(
+            route = "${Destinations.MULTI_TASK_PREVIEW}/{displayIds}",
+            arguments = listOf(
+                navArgument("displayIds") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val displayIds = backStackEntry.arguments?.getString("displayIds")?.split(",")?.mapNotNull { it.toIntOrNull() } ?: emptyList()
+            MultiTaskPreviewScreen(navController, displayIds)
         }
         composable(
             route = "${Destinations.TASK_EXECUTION}/{packageName}/{apiKey}/{hostUrl}/{modelId}/{task}",

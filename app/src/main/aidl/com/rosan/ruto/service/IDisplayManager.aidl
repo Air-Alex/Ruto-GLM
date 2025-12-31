@@ -6,15 +6,25 @@ import android.view.Surface;
 import com.rosan.ruto.display.BitmapWrapper;
 
 interface IDisplayManager {
-    int[] getDisplayIds();
+    void onDestroy() = 16711679;
 
-    DisplayInfo getDisplayInfo(int displayId);
+    int[] getDisplayIds() = 1;
 
-    int createDisplay(in Surface surface);
+    List<DisplayInfo> getDisplays() = 2;
 
-    BitmapWrapper capture(int displayId);
+    DisplayInfo getDisplayInfo(int displayId) = 3;
 
-    void release(int displayId);
+    int createDisplay(in String name, int width, int height, int density, in Surface surface) = 4;
 
-    void setSurface(int displayId, in Surface surface);
+    int mirrorDisplay(int displayId, in Surface surface) = 5;
+
+    boolean isMyDisplay(int displayId) = 6;
+
+    BitmapWrapper capture(int displayId) = 7;
+
+    void setSurface(int displayId, in Surface surface) = 8;
+
+    void release(int displayId) = 9;
+
+    int createDisplay2(in Surface surface) = 10;
 }

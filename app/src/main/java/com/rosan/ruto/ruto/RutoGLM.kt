@@ -167,7 +167,9 @@ class RutoGLM(
         onCapture: suspend () -> Bitmap?
     ): String {
         Log.e("r0s", "task $text")
-        val image = toImageContent(onCapture())
+        val bitmap = onCapture()
+        Log.e("r0s", "bitmap $bitmap")
+        val image = toImageContent(bitmap)
         Log.e("r0s", "capture $image")
         Log.e("r0s", "request $image")
         var aiMessage = ""

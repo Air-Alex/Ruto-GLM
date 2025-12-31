@@ -76,7 +76,7 @@ class TaskExecutionViewModel(
         executionJob = viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = TaskExecutionUiState.Running("Creating virtual display...\n")
             try {
-                val newDisplayId = deviceRepo.displayManager.createDisplay(surface)
+                val newDisplayId = deviceRepo.displayManager.createDisplay2(surface)
                 if (newDisplayId == -1) {
                     throw IllegalStateException("Failed to create display")
                 }

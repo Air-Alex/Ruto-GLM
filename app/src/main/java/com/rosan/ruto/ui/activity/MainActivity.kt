@@ -9,8 +9,8 @@ import com.rosan.ruto.ui.compose.theme.RutoTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
         setContent {
             RutoTheme {
                 NavGraph()

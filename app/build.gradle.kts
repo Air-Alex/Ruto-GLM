@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.rikka.refine)
+    alias(libs.plugins.google.devtools.ksp)
 }
 
 val keystoreDir: String = "$rootDir/keystore"
@@ -19,9 +20,7 @@ for (name in arrayOf("r0s.properties", "debug.properties")) {
 
 android {
     namespace = "com.rosan.ruto"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.rosan.ruto"
@@ -29,6 +28,10 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        ksp {
+            arg("room.schemaLocation", "$projectDir/schemas")
+        }
     }
 
     signingConfigs {
@@ -60,10 +63,15 @@ android {
         aidl = true
         compose = true
     }
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
     implementation(project(":ext"))
+    implementation(libs.androidx.compose.foundation)
     compileOnly(project(":hidden-api"))
 
     implementation(libs.androidx.core.ktx)
@@ -78,6 +86,11 @@ dependencies {
     implementation(libs.compose.materialIcons)
 
     implementation(libs.androidx.compose.navigation)
+
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+
+    ksp(libs.androidx.room.compiler)
 
     implementation(libs.lsposed.hiddenapibypass)
 
@@ -97,4 +110,6 @@ dependencies {
     implementation(libs.langchain4j.kotlin)
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation(libs.langchain4j.openai)
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

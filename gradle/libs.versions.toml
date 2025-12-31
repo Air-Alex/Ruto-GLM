@@ -1,7 +1,7 @@
 [versions]
 agp = "8.13.2"
 annotation = "1.9.1"
-kotlin = "2.0.21"
+kotlin = "2.3.0"
 coreKtx = "1.17.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
@@ -12,6 +12,9 @@ composeBom = "2024.09.00"
 ktx-coroutines = "1.10.2"
 rikka-shizuku = "13.1.5"
 rikka-refine = "4.4.0"
+foundation = "1.10.0"
+room = "2.8.4"
+ksp = "2.3.0"
 
 [plugins]
 toolchains-resolver = { id = "org.gradle.toolchains.foojay-resolver-convention", version = "1.0.0" }
@@ -21,6 +24,7 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 rikka-refine = { id = "dev.rikka.tools.refine", version.ref = "rikka-refine" }
+google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [libraries]
 annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
@@ -38,6 +42,10 @@ compose-materialIcons = { group = "androidx.compose.material", name = "material-
 
 ktx-coroutines_core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "ktx-coroutines" }
 ktx-coroutines_android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "ktx-coroutines" }
+
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
 # AndroidHiddenApiBypass
 # https://github.com/LSPosed/AndroidHiddenApiBypass
@@ -60,7 +68,7 @@ rikka-shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", versi
 
 # AndroidAppProcess
 # https://github.com/iamr0s/AndroidAppProcess
-iamr0s-androidAppProcess = { group = "io.github.iamr0s", name = "AndroidAppProcess", version = "1.4.1" }
+iamr0s-androidAppProcess = { group = "io.github.iamr0s", name = "AndroidAppProcess", version = "1.4.2" }
 
 # OpenAI Kotlin
 # https://github.com/aallam/openai-kotlin
@@ -73,3 +81,4 @@ ktor-client-okhttp = { module = 'io.ktor:ktor-client-okhttp' }
 langchain4j-bom = { module = "dev.langchain4j:langchain4j-bom", version = "1.9.1" }
 langchain4j-kotlin = { module = "dev.langchain4j:langchain4j-kotlin" }
 langchain4j-openai = { module = "dev.langchain4j:langchain4j-open-ai" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }

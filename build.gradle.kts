@@ -17,14 +17,22 @@ subprojects {
     pluginManager.withPlugin("com.android.application") {
         extensions.configure<ApplicationExtension> {
             compileSdk = 36
+            compileOptions {
+                isCoreLibraryDesugaringEnabled = true
+            }
         }
+        dependencies.add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:2.1.5")
     }
 
     pluginManager.withPlugin("com.android.library") {
         extensions.configure<LibraryExtension> {
             compileSdk = 36
             defaultConfig.minSdk = 21
+            compileOptions {
+                isCoreLibraryDesugaringEnabled = true
+            }
         }
+        dependencies.add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:2.1.5")
     }
 
     pluginManager.withPlugin("org.jetbrains.kotlin.android") {

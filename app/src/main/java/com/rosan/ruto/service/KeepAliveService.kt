@@ -8,17 +8,14 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.media.ImageReader
 import android.os.Binder
 import android.os.Build
-import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.util.Log
 import android.view.Display
 import android.view.InputEvent
-import android.view.PixelCopy
 import android.view.Surface
 import androidx.core.app.NotificationCompat
 import com.rosan.ruto.device.repo.DeviceRepo
@@ -30,12 +27,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.coroutines.resume
 
 class KeepAliveService : Service(), KoinComponent {
 
@@ -54,7 +49,6 @@ class KeepAliveService : Service(), KoinComponent {
         var displayId: Int,
         var status: TaskStatus = TaskStatus.RUNNING,
         var statusMessage: String? = null,
-        var surface: Surface,
         val listeners: MutableList<ITaskListener> = CopyOnWriteArrayList(),
         var job: Job? = null
     )
@@ -131,32 +125,11 @@ class KeepAliveService : Service(), KoinComponent {
         tasks[key]?.listeners?.remove(listener)
     }
 
-    private fun createNewSurface(key: String, displayId: Int): Surface {
-        Log.e("r0s", "create new surface")
-        val targetDisplayId = if (displayId == -1) Display.DEFAULT_DISPLAY else displayId
-        val displayInfo = deviceRepo.displayManager.getDisplayInfo(targetDisplayId)
-
-        val imageReader = ImageReader.newInstance(
-            displayInfo.logicalWidth,
-            displayInfo.logicalHeight,
-            PixelFormat.RGBA_8888,
-            1
-        )
-        imageReaderMap[key] = imageReader
-        Log.e("r0s", "create new surface ${imageReader.surface}")
-        return imageReader.surface
-    }
-
     fun setSurface(key: String, surface: Surface?) {
         Log.e("r0s", "setSurface $surface $key")
         tasks[key]?.let { taskContext ->
-            imageReaderMap.remove(key)?.close()
-
-            val finalSurface = surface ?: createNewSurface(key, taskContext.displayId)
-
-            taskContext.surface = finalSurface
             if (taskContext.displayId != -1) {
-                deviceRepo.displayManager.setSurface(taskContext.displayId, finalSurface)
+                deviceRepo.displayManager.setSurface(taskContext.displayId, surface)
             }
         }
     }
@@ -202,14 +175,12 @@ class KeepAliveService : Service(), KoinComponent {
             stopTask(key)
         }
 
-        val newSurface = createNewSurface(key, displayId)
         val taskContext = InternalTaskContext(
             apiKey = apiKey,
             hostUrl = hostUrl,
             modelId = modelId,
             task = task,
-            displayId = displayId,
-            surface = newSurface
+            displayId = displayId
         )
         listener?.let { taskContext.listeners.add(it) }
         tasks[key] = taskContext
@@ -232,7 +203,7 @@ class KeepAliveService : Service(), KoinComponent {
             runCatching {
                 if (taskContext.displayId == -1) {
                     taskContext.displayId =
-                        deviceRepo.displayManager.createDisplay(taskContext.surface)
+                        deviceRepo.displayManager.createDisplay2(null)
                 }
 
                 if (packageName.isNotBlank()) {
@@ -251,51 +222,22 @@ class KeepAliveService : Service(), KoinComponent {
                         taskContext.listeners.forEach { it.onThink(think.trim()) }
                     },
                     onCapture = {
-                        suspendCancellableCoroutine { continuation ->
-                            tasks[key]?.let { currentTaskContext ->
-                                runCatching {
-                                    val wrapper =
-                                        deviceRepo.displayManager.capture(currentTaskContext.displayId)
-                                    continuation.resume(wrapper.bitmap)
-                                    return@let
-                                }
-                                val surface = currentTaskContext.surface
-                                val displayInfo =
-                                    deviceRepo.displayManager.getDisplayInfo(currentTaskContext.displayId)
-                                val bitmap = Bitmap.createBitmap(
-                                    displayInfo.logicalWidth,
-                                    displayInfo.logicalHeight,
-                                    Bitmap.Config.ARGB_8888
-                                )
-                                val rect =
-                                    Rect(0, 0, displayInfo.logicalWidth, displayInfo.logicalHeight)
-
-                                fun pixelcopy(i: Int = 0) {
-                                    PixelCopy.request(surface, rect, bitmap, { result ->
-                                        Log.e("r0s", "${result == PixelCopy.SUCCESS}")
-                                        if (result == PixelCopy.SUCCESS) {
-                                            continuation.resume(bitmap)
-                                        } else {
-                                            if (i == 4) continuation.resume(null)
-                                            else {
-                                                Thread.sleep(1000)
-                                                pixelcopy(i + 1)
-                                            }
-//                                            continuation.resume(null)
-                                        }
-                                    }, Handler(thread.looper))
-                                }
-                                pixelcopy()
-                            } ?: run {
-                                continuation.resume(null)
-                            }
-                        }
+                        val co = tasks[key]!!
+                        val display = deviceRepo.displayManager.getDisplayInfo(co.displayId)
+                        val width = display.logicalWidth
+                        val height = display.logicalHeight
+                        deviceRepo.displayManager.capture(co.displayId)?.bitmap
+                            ?: Bitmap.createBitmap(
+                                width, height,
+                                Bitmap.Config.ARGB_8888
+                            )
                     }
                 )
 //                taskContext.status = TaskStatus.COMPLETED
 //                taskContext.statusMessage = "Task completed successfully."
 //                taskContext.listeners.forEach { it.onFinish() }
             }.onFailure { error ->
+                error.printStackTrace()
                 if (error is kotlinx.coroutines.CancellationException) {
                     return@onFailure
                 }

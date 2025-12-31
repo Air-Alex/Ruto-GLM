@@ -2,6 +2,9 @@ package com.rosan.ruto.di
 
 import com.rosan.ruto.ui.viewmodel.AppListViewModel
 import com.rosan.ruto.ui.viewmodel.HomeViewModel
+import com.rosan.ruto.ui.viewmodel.MultiTaskPreviewViewModel
+import com.rosan.ruto.ui.viewmodel.ScreenListViewModel
+import com.rosan.ruto.ui.viewmodel.ScreenPreviewViewModel
 import com.rosan.ruto.ui.viewmodel.TaskExecutionViewModel
 import com.rosan.ruto.ui.viewmodel.TaskListViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -13,4 +16,7 @@ val viewModelModule = module {
     viewModelOf(::TaskExecutionViewModel)
     viewModel { HomeViewModel(get(), get()) }
     viewModelOf(::TaskListViewModel)
+    viewModelOf(::ScreenListViewModel)
+    viewModel { params -> ScreenPreviewViewModel(params.get(), get()) }
+    viewModel { params -> MultiTaskPreviewViewModel(params.get(), get()) }
 }

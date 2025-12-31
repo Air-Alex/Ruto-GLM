@@ -78,7 +78,7 @@ fun HomeBakScreen(navController: NavController, insets: PaddingValues) {
                 onClick = {
                     scope.launch(Dispatchers.IO) {
                         val currentSurface = surface ?: return@launch
-                        val newId = device.displayManager.createDisplay(currentSurface)
+                        val newId = device.displayManager.createDisplay2(currentSurface)
                         if (newId != -1) {
                             displayId = newId
                         }

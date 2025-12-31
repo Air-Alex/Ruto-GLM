@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -142,6 +143,20 @@ fun HomeScreen(navController: NavController, insets: WindowInsets) {
                     supportingContent = { Text("Click to view running tasks") },
                     leadingContent = {
                         Icon(Icons.Default.List, contentDescription = "Running Tasks")
+                    }
+                )
+            }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable { navController.navigate(Destinations.SCREEN_LIST) }
+            ) {
+                ListItem(
+                    headlineContent = { Text("Screen List") },
+                    supportingContent = { Text("Click to view screen list") },
+                    leadingContent = {
+                        Icon(Icons.Default.PhoneAndroid, contentDescription = "Screen List")
                     }
                 )
             }

@@ -10,6 +10,8 @@ public final class DisplayInfo implements Parcelable {
 
     public DisplayAddress address;
 
+    public String name;
+
     public int logicalWidth;
 
     public int logicalHeight;

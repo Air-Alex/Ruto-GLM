@@ -4,6 +4,7 @@ import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
+import android.os.IBinder
 import androidx.annotation.Keep
 import androidx.core.content.getSystemService
 import com.rosan.installer.ext.util.pendingActivity
@@ -29,8 +30,6 @@ class ActivityManagerService @Keep constructor(private val context: Context) :
     }
 
     override fun startActivity(intent: Intent, displayId: Int) {
-
-
         val options = ActivityOptions.makeBasic()
         options.launchDisplayId = displayId
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
