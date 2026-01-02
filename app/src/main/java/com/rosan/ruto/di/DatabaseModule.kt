@@ -11,9 +11,11 @@ val databaseModule = module {
             androidApplication(),
             AppDatabase::class.java,
             "ruto-database"
+        ).fallbackToDestructiveMigration(
+            false
         ).build()
     }
 
-    single { get<AppDatabase>().aiTaskDao() }
-    single { get<AppDatabase>().taskDataDao() }
+    single { get<AppDatabase>().conversations() }
+    single { get<AppDatabase>().messages() }
 }

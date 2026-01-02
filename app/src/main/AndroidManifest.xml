@@ -21,7 +21,8 @@
         <activity
             android:name=".ui.activity.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.Ruto">
+            android:theme="@style/Theme.Ruto"
+            android:windowSoftInputMode="adjustNothing">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

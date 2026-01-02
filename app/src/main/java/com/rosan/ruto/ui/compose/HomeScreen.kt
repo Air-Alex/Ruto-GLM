@@ -8,12 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -157,6 +158,20 @@ fun HomeScreen(navController: NavController, insets: WindowInsets) {
                     supportingContent = { Text("Click to view screen list") },
                     leadingContent = {
                         Icon(Icons.Default.PhoneAndroid, contentDescription = "Screen List")
+                    }
+                )
+            }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable { navController.navigate(Destinations.CONVERSATION_LIST) }
+            ) {
+                ListItem(
+                    headlineContent = { Text("Conversations") },
+                    supportingContent = { Text("Click to view conversations") },
+                    leadingContent = {
+                        Icon(Icons.Default.Chat, contentDescription = "Conversations")
                     }
                 )
             }

@@ -1,6 +1,5 @@
 package com.rosan.ruto.ui.compose
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,9 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.rosan.ruto.ui.Destinations
 import com.rosan.ruto.ui.model.AppItem
 import com.rosan.ruto.ui.viewmodel.AppListUiState
@@ -102,8 +101,8 @@ fun AppListScreen(navController: NavController, insets: WindowInsets) {
                                 headlineContent = { Text(item.label) },
                                 supportingContent = { Text(item.appInfo.packageName) },
                                 leadingContent = {
-                                    Image(
-                                        bitmap = item.icon.asImageBitmap(),
+                                    AsyncImage(
+                                        model = item.icon,
                                         contentDescription = "${item.label} icon",
                                         modifier = Modifier.size(40.dp)
                                     )

@@ -111,5 +111,8 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation(libs.langchain4j.openai)
 
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.github.jeziellago:compose-markdown:0.5.8")
+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

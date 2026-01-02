@@ -2,13 +2,24 @@ package com.rosan.ruto.data
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.rosan.ruto.data.dao.AITaskDao
-import com.rosan.ruto.data.dao.TaskDataDao
-import com.rosan.ruto.data.model.AITask
-import com.rosan.ruto.data.model.TaskData
+import androidx.room.TypeConverters
+import com.rosan.ruto.data.converter.Converters
+import com.rosan.ruto.data.dao.ConversationDao
+import com.rosan.ruto.data.dao.MessageDao
+import com.rosan.ruto.data.model.AiTypeConverter
+import com.rosan.ruto.data.model.ConversationModel
+import com.rosan.ruto.data.model.ConversationStatusConverter
+import com.rosan.ruto.data.model.MessageModel
+import com.rosan.ruto.data.model.MessageTypeConverter
 
-@Database(entities = [AITask::class, TaskData::class], version = 1)
+@Database(entities = [ConversationModel::class, MessageModel::class], version = 6)
+@TypeConverters(
+    Converters::class, 
+    AiTypeConverter::class, 
+    MessageTypeConverter::class, 
+    ConversationStatusConverter::class
+)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun aiTaskDao(): AITaskDao
-    abstract fun taskDataDao(): TaskDataDao
+    abstract fun conversations(): ConversationDao
+    abstract fun messages(): MessageDao
 }

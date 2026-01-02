@@ -1,20 +1,38 @@
 package com.rosan.ruto.ui.compose
 
 import android.app.Activity
+import android.graphics.Matrix
 import android.graphics.SurfaceTexture
+import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PanTool
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -24,7 +42,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
@@ -32,10 +49,14 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavController
+import com.rosan.ruto.ui.compose.screen_preview.AppPickerDialog
+import com.rosan.ruto.ui.compose.screen_preview.FloatingActionMenu
 import com.rosan.ruto.ui.viewmodel.MultiTaskPreviewViewModel
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
-import kotlin.math.*
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun MultiTaskPreviewScreen(navController: NavController, displayIds: List<Int>) {
@@ -50,6 +71,9 @@ fun MultiTaskPreviewScreen(navController: NavController, displayIds: List<Int>) 
         }
     }
     var topZIndex by remember { mutableFloatStateOf(displayIds.size.toFloat()) }
+    var activeDisplayId by remember { mutableStateOf<Int?>(displayIds.firstOrNull()) }
+    var isDragMode by remember { mutableStateOf(false) }
+    var showAppPickerDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         val window = (view.context as? Activity)?.window
@@ -65,74 +89,91 @@ fun MultiTaskPreviewScreen(navController: NavController, displayIds: List<Int>) 
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1C1E))
+            .pointerInput(Unit) { detectTapGestures { activeDisplayId = null } }
             .drawBehind {
                 val step = 40.dp.toPx()
-                for (x in 0..size.width.toInt() step step.toInt()) {
-                    drawLine(
-                        Color.White.copy(alpha = 0.1f),
-                        Offset(x.toFloat(), 0f),
-                        Offset(x.toFloat(), size.height),
-                        1f
-                    )
-                }
-                for (y in 0..size.height.toInt() step step.toInt()) {
-                    drawLine(
-                        Color.White.copy(alpha = 0.1f),
-                        Offset(0f, y.toFloat()),
-                        Offset(size.width, y.toFloat()),
-                        1f
-                    )
-                }
-            }
-    ) {
+                for (x in 0..size.width.toInt() step step.toInt()) drawLine(
+                    Color.White.copy(alpha = 0.05f),
+                    Offset(x.toFloat(), 0f),
+                    Offset(x.toFloat(), size.height),
+                    1f
+                )
+                for (y in 0..size.height.toInt() step step.toInt()) drawLine(
+                    Color.White.copy(alpha = 0.05f),
+                    Offset(0f, y.toFloat()),
+                    Offset(size.width, y.toFloat()),
+                    1f
+                )
+            }) {
         val screenWidthPx = constraints.maxWidth.toFloat()
         val screenHeightPx = constraints.maxHeight.toFloat()
 
         displayIds.forEachIndexed { index, displayId ->
-            val remoteDisplaySize = displaySizes[displayId]
-            if (remoteDisplaySize != null && remoteDisplaySize.width > 0 && remoteDisplaySize.height > 0) {
-
-                val (windowWidthDp, windowHeightDp) = remember(
-                    remoteDisplaySize,
-                    maxWidth,
-                    maxHeight
-                ) {
-                    val remoteAspect = remoteDisplaySize.width / remoteDisplaySize.height
+            val remoteSize = displaySizes[displayId]
+            if (remoteSize != null && remoteSize.width > 0) {
+                val (winWidthDp, winHeightDp) = remember(remoteSize, maxWidth, maxHeight) {
+                    val remoteAspect = remoteSize.width / remoteSize.height
                     val screenAspect = maxWidth.value / maxHeight.value
-                    if (remoteAspect > screenAspect) {
-                        Pair(maxWidth, maxWidth / remoteAspect)
-                    } else {
-                        Pair(maxHeight * remoteAspect, maxHeight)
-                    }
+                    if (remoteAspect > screenAspect) Pair(maxWidth, maxWidth / remoteAspect)
+                    else Pair(maxHeight * remoteAspect, maxHeight)
                 }
 
-                // 初始位置：居中向右
-                val initialOffset = remember(displayId, screenWidthPx, screenHeightPx) {
-                    val wPx = with(density) { windowWidthDp.toPx() }
-                    val hPx = with(density) { windowHeightDp.toPx() }
-                    val centerX = (screenWidthPx - wPx) / 2f
-                    val centerY = (screenHeightPx - hPx) / 2f
-                    val xShift = with(density) { index * 60.dp.toPx() }
-                    Offset(centerX + xShift, centerY)
+                val initialOffset = remember(displayId) {
+                    val wPx = with(density) { winWidthDp.toPx() }
+                    val hPx = with(density) { winHeightDp.toPx() }
+                    Offset(
+                        (screenWidthPx - wPx) / 2f + index * 60f,
+                        (screenHeightPx - hPx) / 2f + index * 60f
+                    )
                 }
 
                 TaskWindow(
                     displayId = displayId,
                     zIndex = zIndexMap[displayId] ?: 0f,
+                    isSelected = activeDisplayId == displayId,
+                    isDragMode = isDragMode,
                     initialOffset = initialOffset,
-                    width = windowWidthDp,
-                    height = windowHeightDp,
-                    remoteSize = remoteDisplaySize,
+                    width = winWidthDp,
+                    height = winHeightDp,
+                    remoteSize = remoteSize,
                     viewModel = viewModel,
                     onInteract = {
+                        activeDisplayId = displayId
                         if (zIndexMap[displayId] != topZIndex) {
                             topZIndex += 1f
                             zIndexMap[displayId] = topZIndex
                         }
-                    }
-                )
+                    })
             }
         }
+
+        if (showAppPickerDialog && activeDisplayId != null) {
+            AppPickerDialog(onDismiss = { showAppPickerDialog = false }, onAppSelected = { pkg ->
+                showAppPickerDialog = false
+                activeDisplayId?.let { viewModel.launch(it, pkg) }
+            })
+        }
+
+        FloatingActionMenu(
+            subButtons = listOf(
+                Icons.AutoMirrored.Filled.ArrowBack to "Back",
+                Icons.Filled.Apps to "Select App",
+                (if (isDragMode) Icons.Filled.TouchApp else Icons.Filled.PanTool) to "Toggle Mode",
+                Icons.Filled.Close to "Close"
+            ),
+            onButtonClick = { action ->
+                when (action) {
+                    "Back" -> activeDisplayId?.let { viewModel.clickBack(it) }
+                    "Select App" -> if (activeDisplayId != null) showAppPickerDialog = true
+                    "Toggle Mode" -> isDragMode = !isDragMode
+                    "Close" -> navController.popBackStack()
+                }
+            },
+            onButtonLongClick = {},
+            isButtonEnabled = { action -> if (action == "Close" || action == "Toggle Mode") true else activeDisplayId != null },
+            screenWidth = screenWidthPx,
+            screenHeight = screenHeightPx
+        )
     }
 }
 
@@ -140,6 +181,8 @@ fun MultiTaskPreviewScreen(navController: NavController, displayIds: List<Int>) 
 fun TaskWindow(
     displayId: Int,
     zIndex: Float,
+    isSelected: Boolean,
+    isDragMode: Boolean,
     initialOffset: Offset,
     width: Dp,
     height: Dp,
@@ -147,93 +190,157 @@ fun TaskWindow(
     viewModel: MultiTaskPreviewViewModel,
     onInteract: () -> Unit
 ) {
-    // 1. 布局位移 (控制盒子在屏幕上的位置)
+    // 状态管理
     var offset by remember(displayId) { mutableStateOf(initialOffset) }
-    // 2. 绘制变换 (只负责缩放和旋转)
     var scale by remember(displayId) { mutableFloatStateOf(1f) }
     var rotation by remember(displayId) { mutableFloatStateOf(0f) }
+
+    val animatedBorderColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f),
+        label = "borderColor"
+    )
 
     Box(
         modifier = Modifier
             .zIndex(zIndex)
-            // 第一步：应用位移。此时 offset 对应的是屏幕 1:1 的像素。
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-            // 第二步：应用缩放和旋转。graphicsLayer 会以当前 Box 中心为原点进行变换。
+            // 使用 graphicsLayer 统一处理所有变换（包括位移），避免坐标系分裂
             .graphicsLayer {
-                this.scaleX = scale
-                this.scaleY = scale
-                this.rotationZ = rotation
+                translationX = offset.x
+                translationY = offset.y
+                scaleX = scale
+                scaleY = scale
+                rotationZ = rotation
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
             }
             .size(width, height)
+            .clip(MaterialTheme.shapes.extraLarge)
             .background(Color.Black)
-            .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
-            .pointerInput(displayId) {
-                detectTransformGestures { _, pan, zoom, rotationChange ->
-                    onInteract()
+            .border(
+                if (isSelected) 3.dp else 1.dp,
+                animatedBorderColor,
+                shape = MaterialTheme.shapes.extraLarge
+            )
+            // 拖动/缩放手势监听（父级处理）
+            .pointerInput(displayId, isDragMode) {
+                // 只有在拖动模式下，Compose 才接管手势
+                if (isDragMode) {
+                    detectTransformGestures { centroid, pan, zoom, rotationChange ->
+                        onInteract() // 拖动开始即激活
 
-                    // 【致命点修正】：
-                    // detectTransformGestures 的 pan 是基于 Box 的本地坐标系的。
-                    // 当 Box 被缩放后，本地坐标系的 1px 不再等于屏幕的 1px。
-                    // 为了让手感 1:1，必须把 pan 映射回屏幕缩放后的比例。
+                        // 计算变换
+                        val oldScale = scale
+                        scale = (scale * zoom).coerceIn(0.1f, 15f)
+                        rotation += rotationChange
 
-                    // 1. 抵消旋转：
-                    val angleRad = rotation * (PI.toFloat() / 180f)
-                    val cosA = cos(angleRad)
-                    val sinA = sin(angleRad)
-                    val rotatedPanX = pan.x * cosA - pan.y * sinA
-                    val rotatedPanY = pan.x * sinA + pan.y * cosA
+                        // 修正位移，确保缩放中心正确
+                        val angleRad = rotation * (PI.toFloat() / 180f)
+                        val cosA = cos(angleRad);
+                        val sinA = sin(angleRad)
+                        val rotatedPanX = pan.x * cosA - pan.y * sinA
+                        val rotatedPanY = pan.x * sinA + pan.y * cosA
 
-                    // 2. 【核心补偿】：乘以当前的 scale。
-                    // 放大 10 倍时，Box 变大了，手指动 1px，offset 必须加 10px 才能视觉跟手。
-                    // 缩小 0.1 倍时，Box 变小了，手指动 1px，offset 只加 0.1px 才能防止飞出去。
-                    offset += Offset(rotatedPanX * scale, rotatedPanY * scale)
-
-                    scale = (scale * zoom).coerceIn(0.05f, 15f)
-                    rotation += rotationChange
+                        // 这里的 offset 只是逻辑值，实际应用在 graphicsLayer.translation
+                        offset = offset + centroid * oldScale - centroid * scale + Offset(
+                            rotatedPanX * oldScale, rotatedPanY * oldScale
+                        )
+                    }
                 }
-            }
-            .pointerInput(displayId) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.changes.any { it.pressed }) {
-                            onInteract()
-                        }
+            }) {
+        AndroidView(factory = { context ->
+            TextureView(context).also { textureView ->
+                textureView.isOpaque = true
+                // 清除自身的矩阵，完全依赖 Compose 的 graphicsLayer
+                textureView.setTransform(null)
+                textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                    override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                        st.setDefaultBufferSize(
+                            remoteSize.width.toInt(), remoteSize.height.toInt()
+                        )
+                        viewModel.setSurface(displayId, Surface(st))
+                    }
+
+                    override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                        viewModel.setSurface(displayId, null)
+                        return true
+                    }
+
+                    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                    }
+
+                    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {
+                        st.setDefaultBufferSize(
+                            remoteSize.width.toInt(), remoteSize.height.toInt()
+                        )
                     }
                 }
             }
-    ) {
-        // ... AndroidView 保持不变 ...
-        AndroidView(
-            factory = { context ->
-                TextureView(context).apply {
-                    isOpaque = true
-                    surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                        override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
-                            st.setDefaultBufferSize(
-                                remoteSize.width.roundToInt(),
-                                remoteSize.height.roundToInt()
-                            )
-                            viewModel.setSurface(displayId, Surface(st))
-                        }
+        }, modifier = Modifier.fillMaxSize(), update = { textureView ->
+            textureView.setOnTouchListener { v, event ->
+                v.parent.requestDisallowInterceptTouchEvent(true)
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) onInteract()
+                if (isDragMode) return@setOnTouchListener false
 
-                        override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                            viewModel.setSurface(displayId, null)
-                            return true
-                        }
+                val vw = v.width.toFloat()
+                val vh = v.height.toFloat()
+                if (vw <= 0 || vh <= 0) return@setOnTouchListener true
 
-                        override fun onSurfaceTextureSizeChanged(
-                            st: SurfaceTexture,
-                            w: Int,
-                            h: Int
-                        ) {
-                        }
+                fun transformMotionEvent(
+                    event: MotionEvent, inverseMatrix: Matrix
+                ): MotionEvent {
+                    val pointerCount = event.pointerCount
+                    val pointerProperties =
+                        arrayOfNulls<MotionEvent.PointerProperties>(pointerCount)
+                    val pointerCoords = arrayOfNulls<MotionEvent.PointerCoords>(pointerCount)
 
-                        override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                    for (i in 0 until pointerCount) {
+                        // 获取原始属性
+                        val prop = MotionEvent.PointerProperties()
+                        event.getPointerProperties(i, prop)
+                        pointerProperties[i] = prop
+
+                        // 获取原始坐标并应用逆矩阵
+                        val coords = MotionEvent.PointerCoords()
+                        event.getPointerCoords(i, coords)
+
+                        val pts = floatArrayOf(coords.x, coords.y)
+                        inverseMatrix.mapPoints(pts)
+
+                        coords.x = pts[0]
+                        coords.y = pts[1]
+                        pointerCoords[i] = coords
                     }
+
+                    return MotionEvent.obtain(
+                        event.downTime,
+                        event.eventTime,
+                        event.action,
+                        pointerCount,
+                        pointerProperties.requireNoNulls(),
+                        pointerCoords.requireNoNulls(),
+                        event.metaState,
+                        event.buttonState,
+                        event.xPrecision,
+                        event.yPrecision,
+                        displayId,
+                        event.edgeFlags,
+                        event.source,
+                        event.flags
+                    )
                 }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+
+                val matrix = Matrix()
+                val xScale = (vw / remoteSize.width) * scale
+                val yScale = (vh / remoteSize.height) * scale
+                matrix.postScale(xScale, yScale, 0f, 0f)
+                matrix.postRotate(rotation)
+                val inverse = Matrix()
+                if (matrix.invert(inverse)) {
+                    val transformedEvent = transformMotionEvent(event, inverse)
+                    viewModel.injectEvent(displayId, transformedEvent)
+                    transformedEvent.recycle()
+                }
+                true
+            }
+        })
     }
 }

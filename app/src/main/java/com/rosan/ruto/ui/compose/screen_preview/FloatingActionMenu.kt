@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -37,6 +38,8 @@ fun FloatingActionMenu(
     isButtonEnabled: (String) -> Boolean,
     screenWidth: Float,
     screenHeight: Float,
+    // --- 强制闲置参数：为 true 时立即飞向边缘并锁定 ---
+    forceIdle: Boolean = false
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -46,8 +49,6 @@ fun FloatingActionMenu(
     val fabAnimatableOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     var isPlaced by remember { mutableStateOf(false) }
     var isExpanded by remember { mutableStateOf(false) }
-
-    // 状态控制：是否处于闲置状态
     var isIdle by remember { mutableStateOf(false) }
 
     val cutout = view.rootWindowInsets?.displayCutout
@@ -55,29 +56,32 @@ fun FloatingActionMenu(
     val safeTop = cutout?.safeInsetTop?.toFloat() ?: 0f
     val safeRight = cutout?.safeInsetRight?.toFloat() ?: 0f
     val safeBottom = cutout?.safeInsetBottom?.toFloat() ?: 0f
+    val padding = with(density) { 16.dp.toPx() }
 
-    // --- 动画处理 ---
+    // --- 核心：强制靠边逻辑 ---
+    LaunchedEffect(fabAnimatableOffset.value, isExpanded, forceIdle, fabSize) {
+        if (forceIdle) {
+            isExpanded = false
+            isIdle = true
 
-    // 1. 透明度动画
-    val idleAlpha by animateFloatAsState(
-        targetValue = if (isIdle && !isExpanded) 0.4f else 1f,
-        animationSpec = tween(durationMillis = 500),
-        label = "alphaAnim"
-    )
+            // 如果大小已测量，则计算最近的边并执行平滑飞越动画
+            if (fabSize != IntSize.Zero) {
+                val targetX = if (fabAnimatableOffset.value.x + fabSize.width / 2 < screenWidth / 2) {
+                    safeLeft + padding
+                } else {
+                    screenWidth - fabSize.width - safeRight - padding
+                }
 
-    // 2. 缩进位移动画（解决“突兀”的关键）
-    val idleShrinkPx = with(density) { 25.dp.toPx() }
-    val currentExtraX by animateFloatAsState(
-        targetValue = if (isIdle && !isExpanded) {
-            val isAtLeft = fabAnimatableOffset.value.x < screenWidth / 2
-            if (isAtLeft) -idleShrinkPx else idleShrinkPx
-        } else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
-        label = "offsetAnim"
-    )
+                // 执行靠边动画
+                fabAnimatableOffset.animateTo(
+                    targetValue = Offset(targetX, fabAnimatableOffset.value.y),
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                )
+            }
+            return@LaunchedEffect
+        }
 
-    // 3. 闲置计时器：3秒不操作进入 idle 状态
-    LaunchedEffect(fabAnimatableOffset.value, isExpanded) {
+        // 正常操作逻辑
         isIdle = false
         if (!isExpanded) {
             delay(3000)
@@ -85,15 +89,25 @@ fun FloatingActionMenu(
         }
     }
 
-    // 初始化位置
+    val idleAlpha by animateFloatAsState(
+        targetValue = if (isIdle && !isExpanded) 0.4f else 1f,
+        animationSpec = tween(500), label = "alpha"
+    )
+
+    val idleShrinkPx = with(density) { 25.dp.toPx() }
+    val currentExtraX by animateFloatAsState(
+        targetValue = if (isIdle && !isExpanded) {
+            val isAtLeft = fabAnimatableOffset.value.x < screenWidth / 2
+            if (isAtLeft) -idleShrinkPx else idleShrinkPx
+        } else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow), label = "extraX"
+    )
+
+    // 初始化位置逻辑
     if (!isPlaced && fabSize != IntSize.Zero) {
-        val padding = with(density) { 16.dp.toPx() }
         scope.launch {
             fabAnimatableOffset.snapTo(
-                Offset(
-                    x = screenWidth - fabSize.width - padding,
-                    y = (screenHeight - fabSize.height) / 2f
-                )
+                Offset(screenWidth - fabSize.width - padding, screenHeight / 2f)
             )
         }
         isPlaced = true
@@ -101,6 +115,7 @@ fun FloatingActionMenu(
 
     Box(
         modifier = Modifier
+            .zIndex(Float.MAX_VALUE)
             .offset {
                 IntOffset(
                     (fabAnimatableOffset.value.x + currentExtraX).roundToInt(),
@@ -108,12 +123,10 @@ fun FloatingActionMenu(
                 )
             }
             .onSizeChanged { fabSize = it }
-            .pointerInput(Unit) {
+            .pointerInput(forceIdle) {
+                if (forceIdle) return@pointerInput // 锁定状态，禁止拖拽
                 detectDragGestures(
-                    onDragStart = {
-                        isExpanded = false
-                        isIdle = false
-                    },
+                    onDragStart = { isExpanded = false; isIdle = false },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         val maxX = (screenWidth - fabSize.width - safeRight).coerceAtLeast(0f)
@@ -123,7 +136,6 @@ fun FloatingActionMenu(
                         scope.launch { fabAnimatableOffset.snapTo(Offset(newX, newY)) }
                     },
                     onDragEnd = {
-                        val padding = with(density) { 16.dp.toPx() }
                         val targetX = if (fabAnimatableOffset.value.x + fabSize.width / 2 < screenWidth / 2) {
                             safeLeft + padding
                         } else {
@@ -143,6 +155,7 @@ fun FloatingActionMenu(
         val radius = with(density) { 100.dp.toPx() }
         val isAtLeft = fabAnimatableOffset.value.x < screenWidth / 2
 
+        // 原有角度逻辑回归
         val startAngle = if (isAtLeft) -PI / 2.2 else PI - PI / 2.2
         val endAngle = if (isAtLeft) PI / 2.2 else PI + PI / 2.2
         val step = if (subButtons.size > 1) (endAngle - startAngle) / (subButtons.size - 1) else 0.0
@@ -150,7 +163,7 @@ fun FloatingActionMenu(
         subButtons.forEachIndexed { index, pair ->
             val angle = (startAngle + index * step).toFloat()
             val progress by animateFloatAsState(
-                targetValue = if (isExpanded) 1f else 0f,
+                targetValue = if (isExpanded && !isIdle) 1f else 0f,
                 animationSpec = tween(
                     durationMillis = 300,
                     delayMillis = if (isExpanded) index * 60 else (subButtons.size - 1 - index) * 40
@@ -158,7 +171,6 @@ fun FloatingActionMenu(
             )
 
             val buttonName = pair.second
-            // 补回了你原来的参数逻辑
             RadialButton(
                 icon = pair.first,
                 progress = progress,
@@ -174,12 +186,14 @@ fun FloatingActionMenu(
             )
         }
 
-        val rotationFab by animateFloatAsState(if (isExpanded) 135f else 0f, label = "rotate")
+        val rotationFab by animateFloatAsState(if (isExpanded && !isIdle) 135f else 0f)
 
         FloatingActionButton(
             onClick = {
-                isExpanded = !isExpanded
-                isIdle = false
+                if (!forceIdle) { // 锁定状态，禁止点击唤醒
+                    isExpanded = !isExpanded
+                    isIdle = false
+                }
             },
             modifier = Modifier
                 .size(48.dp)

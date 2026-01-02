@@ -58,6 +58,14 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
     var selectedDisplayIds by remember { mutableStateOf(emptySet<Int>()) }
     val isInSelectionMode = selectedDisplayIds.isNotEmpty()
 
+    // 统一定义跳转多任务界面的逻辑
+    val navigateToMultiTask = { ids: List<Int> ->
+        if (ids.isNotEmpty()) {
+            val idsString = ids.joinToString(",")
+            navController.navigate("${Destinations.MULTI_TASK_PREVIEW}/$idsString")
+        }
+    }
+
     fun toggleSelection(displayId: Int) {
         selectedDisplayIds = if (displayId in selectedDisplayIds) {
             selectedDisplayIds - displayId
@@ -95,10 +103,10 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 AnimatedVisibility(visible = isInSelectionMode) {
                     FloatingActionButton(
-                        onClick = { 
-                             val ids = selectedDisplayIds.joinToString(",")
-                            navController.navigate("${Destinations.MULTI_TASK_PREVIEW}/$ids")
-                         },
+                        onClick = {
+                            // 修改：点击悬浮按钮预览选中的多个屏幕
+                            navigateToMultiTask(selectedDisplayIds.toList())
+                        },
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     ) {
@@ -159,12 +167,14 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
                             display = display,
                             isSelected = display.displayId in selectedDisplayIds,
                             onDelete = { viewModel.release(display.displayId) },
-                            onPreview = { navController.navigate("${Destinations.SCREEN_PREVIEW}/${display.displayId}") },
+                            // 修改：预览按钮跳转多任务预览（单元素列表）
+                            onPreview = { navigateToMultiTask(listOf(display.displayId)) },
                             onClick = {
                                 if (isInSelectionMode) {
                                     toggleSelection(display.displayId)
                                 } else {
-                                    navController.navigate("${Destinations.SCREEN_PREVIEW}/${display.displayId}")
+                                    // 修改：普通点击也跳转多任务预览（单元素列表）
+                                    navigateToMultiTask(listOf(display.displayId))
                                 }
                             },
                             onLongClick = {

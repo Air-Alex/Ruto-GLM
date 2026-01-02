@@ -4,9 +4,11 @@ import android.content.Context
 import android.graphics.PointF
 import android.os.Build
 import android.os.IBinder
+import android.os.Process
 import android.os.ServiceManager
 import android.os.SystemClock
 import android.util.Log
+import android.view.Display
 import android.view.InputDevice
 import android.view.InputEvent
 import android.view.KeyEvent
@@ -40,27 +42,35 @@ class InputManagerService @Keep constructor(
         event?.let { injectEvent2(event, displayId = displayId) }
     }
 
+    private val setDisplayIdMethod by lazy {
+        try {
+            InputEvent::class.java.getMethod("setDisplayId", Int::class.javaPrimitiveType)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun injectEvent2(
         ev: InputEvent,
         mode: Int = INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH,
-        uid: Int = -1,
-        displayId: Int = 0
+        uid: Int = Process.INVALID_UID,
+        displayId: Int = Display.DEFAULT_DISPLAY
     ) {
         if (displayId != 0) {
             try {
-                val method =
-                    InputEvent::class.java.getMethod("setDisplayId", Int::class.javaPrimitiveType)
-                method.invoke(ev, displayId)
+                setDisplayIdMethod?.invoke(ev, displayId)
             } catch (e: Exception) {
                 Log.e("InputManager", "Set displayId failed", e)
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) manager.injectInputEventToTarget(
-            ev,
-            mode,
-            uid
-        )
-        else manager.injectInputEvent(ev, mode)
+        if (ev is MotionEvent) ev.offsetLocation(0f, 0f)
+        val b =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) manager.injectInputEventToTarget(
+                ev,
+                mode,
+                uid
+            )
+            else manager.injectInputEvent(ev, mode)
     }
 
     private fun sendTouchEvent(

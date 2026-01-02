@@ -10,6 +10,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.rosan.ruto.ui.compose.AppListScreen
+import com.rosan.ruto.ui.compose.ConversationListScreen
+import com.rosan.ruto.ui.compose.ConversationScreen
 import com.rosan.ruto.ui.compose.GuideScreen
 import com.rosan.ruto.ui.compose.HomeScreen
 import com.rosan.ruto.ui.compose.MultiTaskPreviewScreen
@@ -44,6 +46,18 @@ fun NavGraph() {
         composable(Destinations.SCREEN_LIST) {
             ScreenListScreen(navController, insets)
         }
+        composable(Destinations.CONVERSATION_LIST) {
+            ConversationListScreen(navController, insets)
+        }
+        composable(
+            route = "${Destinations.CONVERSATION}/{conversationId}",
+            arguments = listOf(
+                navArgument("conversationId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val conversationId = backStackEntry.arguments?.getLong("conversationId") ?: 0
+            ConversationScreen(navController, insets, conversationId)
+        }
         composable(
             route = "${Destinations.SCREEN_PREVIEW}/{displayId}",
             arguments = listOf(
@@ -59,7 +73,8 @@ fun NavGraph() {
                 navArgument("displayIds") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val displayIds = backStackEntry.arguments?.getString("displayIds")?.split(",")?.mapNotNull { it.toIntOrNull() } ?: emptyList()
+            val displayIds = backStackEntry.arguments?.getString("displayIds")?.split(",")
+                ?.mapNotNull { it.toIntOrNull() } ?: emptyList()
             MultiTaskPreviewScreen(navController, displayIds)
         }
         composable(

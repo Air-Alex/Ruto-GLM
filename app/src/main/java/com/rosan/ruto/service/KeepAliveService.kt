@@ -7,20 +7,19 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.PixelFormat
 import android.media.ImageReader
 import android.os.Binder
 import android.os.Build
 import android.os.HandlerThread
 import android.os.IBinder
 import android.util.Log
-import android.view.Display
 import android.view.InputEvent
 import android.view.Surface
 import androidx.core.app.NotificationCompat
 import com.rosan.ruto.device.repo.DeviceRepo
 import com.rosan.ruto.ruto.DefaultRutoRuntime
 import com.rosan.ruto.ruto.RutoGLM
+import com.rosan.ruto.ruto.repo.RutoObserver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 class KeepAliveService : Service(), KoinComponent {
+    private val ruto by inject<RutoObserver>()
 
     private val CHANNEL_ID = "KeepAliveServiceChannel"
     private val NOTIFICATION_ID = 1
@@ -83,6 +83,7 @@ class KeepAliveService : Service(), KoinComponent {
         instance = this
         createNotificationChannel()
         thread.start()
+        ruto.onInitialize(CoroutineScope(Dispatchers.IO))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -92,6 +93,7 @@ class KeepAliveService : Service(), KoinComponent {
     }
 
     override fun onDestroy() {
+        ruto.onDestroy()
         thread.join()
         instance = null
         serviceScope.cancel()
