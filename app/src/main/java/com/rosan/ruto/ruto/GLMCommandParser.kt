@@ -26,7 +26,6 @@ object GLMCommandParser {
             val suffixContent: String = fragments.last()
 
             fun callFunction(runtime: RutoRuntime): Any {
-                Log.e("r0s", "${command.mapping} ${arguments.toTypedArray().joinToString("|")}")
                 return runtime.callFunction(command.mapping, arguments = arguments.toTypedArray())
             }
         }

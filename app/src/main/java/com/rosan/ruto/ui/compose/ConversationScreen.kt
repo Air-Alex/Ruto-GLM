@@ -1,6 +1,5 @@
 package com.rosan.ruto.ui.compose
 
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -35,8 +34,6 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -45,6 +42,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -60,6 +58,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -68,7 +67,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -81,6 +79,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush.Companion.verticalGradient
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -89,17 +88,22 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.rosan.ruto.data.model.ConversationStatus
+import com.halilibo.richtext.commonmark.Markdown
+import com.halilibo.richtext.ui.material3.RichText
 import com.rosan.ruto.data.model.MessageModel
-import com.rosan.ruto.data.model.MessageSource
-import com.rosan.ruto.data.model.MessageType
+import com.rosan.ruto.data.model.conversation.ConversationStatus
+import com.rosan.ruto.data.model.message.MessageSource
+import com.rosan.ruto.data.model.message.MessageType
 import com.rosan.ruto.ui.compose.theme.only
 import com.rosan.ruto.ui.compose.theme.plus
-import com.rosan.ruto.viewmodel.ConversationViewModel
-import dev.jeziellago.compose.markdowntext.MarkdownText
+import com.rosan.ruto.ui.viewmodel.ConversationViewModel
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,12 +200,10 @@ fun ConversationScreen(navController: NavController, insets: WindowInsets, conve
                 )
             }
         }
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .imePadding()
-                .navigationBarsPadding(),
+                .padding(padding),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(
@@ -252,7 +254,7 @@ fun ConversationFloatingBar(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("输入消息...") },
+                placeholder = { Text("msg...") },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
@@ -320,16 +322,19 @@ fun MessageBubble(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var isExpanded by remember { mutableStateOf(false) }
-    val isUser = message.source == MessageSource.USER
+    val isUser = message.source == MessageSource.USER ||
+            message.source == MessageSource.SYSTEM
 
     val bubbleShape =
         if (isUser) MaterialTheme.shapes.large.copy(bottomEnd = CornerSize(0.dp))
         else MaterialTheme.shapes.large.copy(bottomStart = CornerSize(0.dp))
 
+    val horizontalPadding = if (isUser) PaddingValues(start = 24.dp) else PaddingValues(end = 24.dp)
+
     val bubbleColor by animateColorAsState(
         if (isSelected) MaterialTheme.colorScheme.surfaceVariant
         else if (message.type == MessageType.ERROR) MaterialTheme.colorScheme.errorContainer
-        else if (isUser) MaterialTheme.colorScheme.primary
+        else if (isUser) MaterialTheme.colorScheme.secondary
         else MaterialTheme.colorScheme.inversePrimary
     )
 
@@ -337,7 +342,10 @@ fun MessageBubble(
         modifier = modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { if (isInSelectionMode) onToggleSelection() },
+                onClick = {
+                    if (isInSelectionMode) onToggleSelection()
+                    else if (message.content.length > 150) isExpanded = !isExpanded
+                },
                 onLongClick = { if (!isInSelectionMode) showMenu = true },
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
@@ -345,17 +353,26 @@ fun MessageBubble(
             .padding(padding),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Text(
+            text = formatTimestamp(message.createdAt),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier
+                .align(if (isUser) Alignment.End else Alignment.Start)
+                .padding(horizontalPadding),
+            color = LocalContentColor.current.copy(alpha = 0.5f)
+        )
+
         Row(
             modifier = modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontalPadding),
                 horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
             ) {
                 Surface(
-                    modifier = Modifier
-                        .padding(if (isUser) PaddingValues(start = 24.dp) else PaddingValues(end = 24.dp)),
                     shape = bubbleShape,
                     color = bubbleColor,
                     tonalElevation = 1.dp
@@ -367,31 +384,31 @@ fun MessageBubble(
                                     modifier = Modifier
                                         .clip(bubbleShape)
                                 ) {
-                                    MarkdownText(
-                                        markdown = message.content,
-                                        syntaxHighlightColor = Color.LightGray.copy(alpha = 0.2f),
-                                        syntaxHighlightTextColor = contentColorFor(bubbleColor),
-                                        isTextSelectable = !isInSelectionMode,
-                                        onClick = {
-                                            if (isInSelectionMode) onToggleSelection()
-                                            else isExpanded = !isExpanded
-                                        },
-                                        modifier = Modifier
-                                            .padding(12.dp)
-                                            .then(
-                                                if (!isExpanded && message.content.length > 300) Modifier.heightIn(
-                                                    max = 200.dp
+                                    SelectionContainer {
+                                        RichText(
+                                            modifier = Modifier
+                                                .padding(12.dp)
+                                                .then(
+                                                    if (!isExpanded && message.content.length > 150) Modifier.heightIn(
+                                                        max = 200.dp
+                                                    )
+                                                    else Modifier
                                                 )
-                                                else Modifier
-                                            )
-                                    )
-
-                                    if (!isExpanded && message.content.length > 300) {
+                                        ) {
+                                            val content =
+                                                if (!isExpanded && message.content.length > 150) message.content.take(
+                                                    300
+                                                )
+                                                else message.content
+                                            Markdown(content)
+                                        }
+                                    }
+                                    if (!isExpanded && message.content.length > 150) {
                                         Box(
                                             modifier = Modifier
                                                 .matchParentSize()
                                                 .background(
-                                                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                    verticalGradient(
                                                         listOf(
                                                             Color.Transparent,
                                                             bubbleColor.copy(alpha = 0.7f)
@@ -438,28 +455,34 @@ fun MessageBubble(
             }
         }
 
-        AnimatedVisibility(
-            message.content.length > 300,
-            modifier = Modifier.align(if (isUser) Alignment.Start else Alignment.End)
-        ) {
-            Text(
-                text = if (isExpanded) "Show Less" else "Read More...",
-                style = MaterialTheme.typography.labelMedium,
-                color = contentColorFor(bubbleColor).copy(alpha = 0.7f),
-                modifier = Modifier
-                    .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
-                    .combinedClickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = { isExpanded = !isExpanded }
-                    )
-            )
-        }
-
         if (!isUser && isLastMessage && isRunning) {
-            TypingIndicator(color = contentColorFor(bubbleColor))
+            TypingIndicator(color = LocalContentColor.current)
         }
     }
+}
+
+fun formatTimestamp(timestamp: Long): String {
+    val now = Calendar.getInstance()
+    val msg = Calendar.getInstance().apply { timeInMillis = timestamp }
+    val locale = Locale.getDefault()
+
+    val pattern = when {
+        now.get(Calendar.YEAR) == msg.get(Calendar.YEAR) &&
+                now.get(Calendar.DAY_OF_YEAR) == msg.get(Calendar.DAY_OF_YEAR) -> {
+            "HH:mm:ss"
+        }
+
+
+        now.get(Calendar.YEAR) == msg.get(Calendar.YEAR) -> {
+            "MM-dd HH:mm:ss"
+        }
+
+        else -> {
+            "yyyy-MM-dd HH:mm:ss"
+        }
+    }
+
+    return SimpleDateFormat(pattern, locale).format(Date(timestamp))
 }
 
 @Composable

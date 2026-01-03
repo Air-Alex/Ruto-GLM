@@ -88,11 +88,12 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
             is GuideUiState.NotificationPermissionGranted -> {
                 KeepAliveService.start(context)
 
-                if (SettingsManager.areSettingsConfigured(context)) {
-                    uiState = GuideUiState.AllSet
-                } else {
-                    uiState = GuideUiState.ModelConfigNeeded
-                }
+                uiState = GuideUiState.AllSet
+//                if (SettingsManager.areSettingsConfigured(context)) {
+//                    uiState = GuideUiState.AllSet
+//                } else {
+//                    uiState = GuideUiState.ModelConfigNeeded
+//                }
             }
             is GuideUiState.AllSet -> {
                 navController.navigate(Destinations.HOME) {

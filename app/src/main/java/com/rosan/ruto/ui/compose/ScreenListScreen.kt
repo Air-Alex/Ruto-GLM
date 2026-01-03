@@ -58,7 +58,6 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
     var selectedDisplayIds by remember { mutableStateOf(emptySet<Int>()) }
     val isInSelectionMode = selectedDisplayIds.isNotEmpty()
 
-    // 统一定义跳转多任务界面的逻辑
     val navigateToMultiTask = { ids: List<Int> ->
         if (ids.isNotEmpty()) {
             val idsString = ids.joinToString(",")
@@ -92,7 +91,9 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
                 },
                 actions = {
                     if (isInSelectionMode) {
-                        IconButton(onClick = { selectedDisplayIds = uiState.displays.map { it.displayId }.toSet() }) {
+                        IconButton(onClick = {
+                            selectedDisplayIds = uiState.displays.map { it.displayId }.toSet()
+                        }) {
                             Icon(Icons.Default.SelectAll, contentDescription = "Select All")
                         }
                     }
@@ -100,7 +101,10 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
             )
         },
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 AnimatedVisibility(visible = isInSelectionMode) {
                     FloatingActionButton(
                         onClick = {
@@ -141,7 +145,8 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
             onRefresh = { viewModel.loadDisplays() }
         ) {
             if (uiState.displays.isEmpty() && uiState.isRefreshing) {
-                val infiniteTransition = rememberInfiniteTransition(label = "loading_indicator_scale")
+                val infiniteTransition =
+                    rememberInfiniteTransition(label = "loading_indicator_scale")
                 val scale by infiniteTransition.animateFloat(
                     initialValue = 1f, targetValue = 1.5f,
                     animationSpec = infiniteRepeatable(

@@ -25,6 +25,8 @@ abstract class DisplayManagerServiceStub @Keep constructor(private val context: 
     IDisplayManager.Stub() {
     protected val manager = context.getSystemService<DisplayManager>()!!
 
+    protected val imageReaders = mutableListOf<ImageReader>()
+
     protected val displayMap = ConcurrentHashMap<Int, VirtualDisplay>()
 
     val global: DisplayManagerGlobal
@@ -33,9 +35,11 @@ abstract class DisplayManagerServiceStub @Keep constructor(private val context: 
     protected fun createNewName() =
         "ruto-display:${System.currentTimeMillis()}"
 
-    protected fun createNewSurface(width: Int, height: Int): Surface =
-        ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 1)
-            .surface
+    protected fun createNewSurface(width: Int, height: Int): Surface {
+        val imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 1)
+        imageReaders.add(imageReader)
+        return imageReader.surface
+    }
 
     protected fun requireSurface(width: Int, height: Int, surface: Surface? = null): Surface =
         surface ?: createNewSurface(width, height)
@@ -99,10 +103,10 @@ abstract class DisplayManagerServiceStub @Keep constructor(private val context: 
         return surface.pixelCopy(width, height)
     }
 
-    private fun getDisplayPhysicalId(displayId: Int): String {
+    private fun getDisplayPhysicalId(displayId: Int): String? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return displayId.toString()
 
-        val address = getDisplayInfo(displayId).address as DisplayAddress.Physical
+        val address = getDisplayInfo(displayId).address as? DisplayAddress.Physical ?: return null
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             val clazz = DisplayAddress.Physical::class.java
@@ -128,6 +132,9 @@ abstract class DisplayManagerServiceStub @Keep constructor(private val context: 
         displayMap.computeIfPresent(displayId) { _, display ->
             val width = display.display.width
             val height = display.display.height
+
+            releaseSurface(display.surface)
+
             val requireSurface = requireSurface(width, height, surface)
             display.surface = requireSurface
             return@computeIfPresent display
@@ -136,8 +143,15 @@ abstract class DisplayManagerServiceStub @Keep constructor(private val context: 
 
     override fun release(displayId: Int) {
         displayMap.computeIfPresent(displayId) { _, display ->
+            releaseSurface(display.surface)
             display.release()
             return@computeIfPresent null
+        }
+    }
+
+    private fun releaseSurface(surface: Surface) {
+        imageReaders.removeIf {
+            it.surface == surface
         }
     }
 }

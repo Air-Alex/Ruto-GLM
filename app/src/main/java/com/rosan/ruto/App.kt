@@ -1,11 +1,14 @@
 package com.rosan.ruto
 
 import android.app.Application
+import android.app.Service
+import android.os.ServiceManager
 import com.rosan.ruto.di.init.appModules
 import com.rosan.ruto.service.KeepAliveService
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
+import rikka.shizuku.Shizuku
 import rikka.sui.Sui
 
 class App : Application() {

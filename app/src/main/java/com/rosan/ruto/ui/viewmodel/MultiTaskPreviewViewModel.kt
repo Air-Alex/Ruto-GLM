@@ -32,18 +32,11 @@ class MultiTaskPreviewViewModel(
     fun setSurface(displayId: Int, surface: Surface?) {
         viewModelScope.launch(Dispatchers.IO) {
             val dm = device.displayManager
-            if (surface == null) {
-                mirroredDisplayIds[displayId]?.let {
-                    dm.release(it)
-                    mirroredDisplayIds.remove(displayId)
-                }
-                return@launch
-            }
-
-            if (dm.isMyDisplay(displayId)) {
-                dm.setSurface(displayId, surface)
+            val id = mirroredDisplayIds[displayId] ?: displayId
+            if (dm.isMyDisplay(id)) {
+                dm.setSurface(id, surface)
             } else {
-                mirroredDisplayIds[displayId] = dm.mirrorDisplay(displayId, surface)
+                mirroredDisplayIds[id] = dm.mirrorDisplay(id, surface)
             }
         }
     }

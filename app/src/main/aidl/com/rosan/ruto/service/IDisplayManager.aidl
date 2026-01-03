@@ -14,15 +14,15 @@ interface IDisplayManager {
 
     DisplayInfo getDisplayInfo(int displayId) = 3;
 
-    int createDisplay(in String name, int width, int height, int density, in Surface surface) = 4;
+    int createDisplay(in String name, int width, int height, int density, in @nullable Surface surface) = 4;
 
-    int mirrorDisplay(int displayId, in Surface surface) = 5;
+    int mirrorDisplay(int displayId, in @nullable Surface surface) = 5;
 
     boolean isMyDisplay(int displayId) = 6;
 
     BitmapWrapper capture(int displayId) = 7;
 
-    void setSurface(int displayId, in Surface surface) = 8;
+    void setSurface(int displayId, in @nullable Surface surface) = 8;
 
     void release(int displayId) = 9;
 

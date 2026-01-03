@@ -5,9 +5,12 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.Parcel
+import android.os.ParcelFileDescriptor
 import android.os.ResultReceiver
 import android.util.Log
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 
 fun IBinder.shellCommand(vararg args: String) {
     val file = File("/dev/null")
@@ -25,11 +28,51 @@ fun IBinder.shellCommand(vararg args: String) {
         data.writeParcelable(null, 0)
     ResultReceiver(Handler(Looper.getMainLooper())).writeToParcel(data, 0)
     try {
-        Log.e("r0s", "shell command ${args.joinToString(",")}")
         this.transact(1598246212, data, reply, 0)
     } finally {
         input.close()
         output.close()
+        data.recycle()
+        reply.recycle()
+    }
+}
+
+fun IBinder.dumpToBytes(vararg args: String): ByteArray {
+    val pipe = ParcelFileDescriptor.createPipe()
+    val readPfd = pipe[0]
+    val writePfd = pipe[1]
+
+    val data = Parcel.obtain()
+    val reply = Parcel.obtain()
+
+    try {
+        data.writeFileDescriptor(writePfd.fileDescriptor)
+        data.writeStringArray(args)
+
+        this.transact(IBinder.DUMP_TRANSACTION, data, reply, 0)
+
+        writePfd.close()
+
+        val inputStream = FileInputStream(readPfd.fileDescriptor)
+        val outputStream = ByteArrayOutputStream()
+
+        var length = 0
+        while (inputStream.available().also { length = it } > 0) {
+            val buffer = ByteArray(length)
+            outputStream.write(buffer, 0, inputStream.read(buffer))
+        }
+
+        return outputStream.toByteArray()
+
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return byteArrayOf()
+    } finally {
+        readPfd.close()
+        try {
+            writePfd.close()
+        } catch (e: Exception) {
+        }
         data.recycle()
         reply.recycle()
     }

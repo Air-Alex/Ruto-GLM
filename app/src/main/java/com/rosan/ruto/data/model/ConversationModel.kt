@@ -2,23 +2,36 @@ package com.rosan.ruto.data.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
+import com.rosan.ruto.data.model.conversation.ConversationStatus
 
-@Entity(tableName = "conversations")
+@Entity(
+    tableName = "conversations",
+    foreignKeys = [
+        ForeignKey(
+            entity = AiModel::class,
+            parentColumns = ["id"],
+            childColumns = ["ai_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
 data class ConversationModel(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    @ColumnInfo(name = "ai_id")
+    val aiId: Long,
     @ColumnInfo(name = "status")
     val status: ConversationStatus = ConversationStatus.COMPLETED,
-    @ColumnInfo(name = "ai_type")
-    val aiType: AiType,
-    @ColumnInfo(name = "host_url")
-    val hostUrl: String,
-    @ColumnInfo(name = "model_id")
-    val modelId: String,
-    @ColumnInfo(name = "api_key")
-    val apiKey: String,
-    @ColumnInfo(name = "screen_name")
+
+    @ColumnInfo(name = "display_id")
+    val displayId: Int? = null,
+    @ColumnInfo(name = "is_glm_phone")
+    val isGLMPhone: Boolean = true,
+
+
+    @ColumnInfo(name = "name")
     val name: String,
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),

@@ -15,6 +15,7 @@ rikka-refine = "4.4.0"
 foundation = "1.10.0"
 room = "2.8.4"
 ksp = "2.3.0"
+animation = "1.10.0"
 
 [plugins]
 toolchains-resolver = { id = "org.gradle.toolchains.foojay-resolver-convention", version = "1.0.0" }
@@ -82,3 +83,4 @@ langchain4j-bom = { module = "dev.langchain4j:langchain4j-bom", version = "1.9.1
 langchain4j-kotlin = { module = "dev.langchain4j:langchain4j-kotlin" }
 langchain4j-openai = { module = "dev.langchain4j:langchain4j-open-ai" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-compose-animation = { group = "androidx.compose.animation", name = "animation", version.ref = "animation" }

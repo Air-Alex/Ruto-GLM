@@ -5,6 +5,8 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.rosan.ruto.data.model.message.MessageSource
+import com.rosan.ruto.data.model.message.MessageType
 
 @Entity(
     tableName = "messages",

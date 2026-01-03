@@ -3,6 +3,7 @@ package com.rosan.ruto.ui.compose
 import android.app.Activity
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
+import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
@@ -256,10 +257,12 @@ fun TaskWindow(
                         st.setDefaultBufferSize(
                             remoteSize.width.toInt(), remoteSize.height.toInt()
                         )
+                        Log.e("r0s","set surface")
                         viewModel.setSurface(displayId, Surface(st))
                     }
 
                     override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                        Log.e("r0s","null surface")
                         viewModel.setSurface(displayId, null)
                         return true
                     }

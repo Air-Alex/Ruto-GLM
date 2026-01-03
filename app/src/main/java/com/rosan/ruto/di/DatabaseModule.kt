@@ -18,4 +18,5 @@ val databaseModule = module {
 
     single { get<AppDatabase>().conversations() }
     single { get<AppDatabase>().messages() }
+    single { get<AppDatabase>().ais() }
 }

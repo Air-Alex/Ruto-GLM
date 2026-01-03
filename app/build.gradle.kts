@@ -72,6 +72,7 @@ android {
 dependencies {
     implementation(project(":ext"))
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.animation)
     compileOnly(project(":hidden-api"))
 
     implementation(libs.androidx.core.ktx)
@@ -112,7 +113,10 @@ dependencies {
     implementation(libs.langchain4j.openai)
 
     implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("com.github.jeziellago:compose-markdown:0.5.8")
+
+    implementation("com.halilibo.compose-richtext:richtext-ui:1.0.0-alpha03")
+    implementation("com.halilibo.compose-richtext:richtext-ui-material3:1.0.0-alpha03")
+    implementation("com.halilibo.compose-richtext:richtext-commonmark:1.0.0-alpha03")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

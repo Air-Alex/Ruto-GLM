@@ -1,22 +1,25 @@
 package com.rosan.ruto.data.dao
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import com.rosan.ruto.data.model.ConversationModel
-import com.rosan.ruto.data.model.ConversationStatus
 import com.rosan.ruto.data.model.MessageModel
-import com.rosan.ruto.data.model.MessageSource
-import com.rosan.ruto.data.model.MessageType
+import com.rosan.ruto.data.model.conversation.ConversationStatus
+import com.rosan.ruto.data.model.message.MessageSource
+import com.rosan.ruto.data.model.message.MessageType
 import kotlinx.coroutines.flow.Flow
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
 
 @Dao
 interface ConversationDao {
@@ -35,11 +38,22 @@ interface ConversationDao {
         updatedAt: Long = System.currentTimeMillis()
     )
 
+    @Query("UPDATE conversations SET status = :status, updated_at = :updatedAt WHERE id = :id AND updated_at = :lastUpdateAt")
+    suspend fun updateStatusSafely(
+        id: Long,
+        status: ConversationStatus,
+        lastUpdateAt: Long,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
     @Query("SELECT * FROM conversations WHERE id = :id")
     suspend fun get(id: Long): ConversationModel?
 
     @Query("SELECT status FROM conversations WHERE id = :id")
     fun observeStatus(id: Long): Flow<ConversationStatus?>
+
+    @Query("SELECT * FROM conversations WHERE status = :status AND updated_at > :updatedAt")
+    fun observeWhenStatusUpperTime(status: ConversationStatus, updatedAt: Long): Flow<List<ConversationModel>>
 
     @Query("SELECT * FROM conversations")
     fun observeAll(): Flow<List<ConversationModel>>
@@ -57,7 +71,10 @@ abstract class MessageDao : KoinComponent {
     abstract suspend fun add(message: MessageModel): Long
 
     @Transaction
-    open suspend fun addImage(conversationId: Long, inputStream: InputStream): Long {
+    open suspend fun addImage(
+        conversationId: Long,
+        action: (OutputStream) -> Unit
+    ): Long {
         val placeholderMessage = MessageModel(
             conversationId = conversationId,
             source = MessageSource.USER,
@@ -66,15 +83,28 @@ abstract class MessageDao : KoinComponent {
         )
         val messageId = add(placeholderMessage)
         val file = File(imageCacheDir, "$messageId.png")
-        file.outputStream().use { outputStream ->
-            inputStream.copyTo(outputStream)
-        }
+        file.outputStream().use { action.invoke(it) }
 
         chunkToLast(messageId, file.path)
         return messageId
     }
 
+    open suspend fun addImage(conversationId: Long, inputStream: InputStream) =
+        addImage(conversationId) {
+            inputStream.copyTo(it)
+        }
+
     @Transaction
+    open suspend fun addImage(
+        conversationId: Long,
+        bitmap: Bitmap,
+        format: Bitmap.CompressFormat = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY
+        else Bitmap.CompressFormat.WEBP,
+        quality: Int = 0
+    ) = addImage(conversationId) {
+        bitmap.compress(format, quality, it)
+    }
+
     open suspend fun addImage(conversationId: Long, uri: Uri): Long {
         return context.contentResolver.openInputStream(uri)?.buffered()?.use { inputStream ->
             addImage(conversationId, inputStream)
@@ -92,15 +122,15 @@ abstract class MessageDao : KoinComponent {
     @Query("UPDATE messages SET type = :type WHERE id = :messageId")
     abstract suspend fun updateType(messageId: Long, type: MessageType)
 
-    @Query("SELECT * FROM messages  ORDER BY created_at DESC LIMIT 1")
+    @Query("SELECT * FROM messages ORDER BY created_at DESC LIMIT 1")
     abstract fun observeLast(): Flow<MessageModel?>
 
     @Query("SELECT * FROM messages WHERE conversation_id = :conversationId ORDER BY created_at DESC LIMIT 1")
     abstract suspend fun last(conversationId: Long): MessageModel?
 
-    @Query("SELECT * FROM messages WHERE conversation_id = :conversationId")
+    @Query("SELECT * FROM messages WHERE conversation_id = :conversationId ORDER BY created_at ASC")
     abstract fun observeAll(conversationId: Long): Flow<List<MessageModel>>
 
-    @Query("SELECT * FROM messages WHERE conversation_id = :conversationId")
+    @Query("SELECT * FROM messages WHERE conversation_id = :conversationId ORDER BY created_at ASC")
     abstract fun all(conversationId: Long): List<MessageModel>
 }

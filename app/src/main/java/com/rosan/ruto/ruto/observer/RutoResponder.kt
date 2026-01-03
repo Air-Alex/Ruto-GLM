@@ -4,20 +4,19 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import com.rosan.installer.ext.util.coroutines.takeUntil
 import com.rosan.ruto.data.AppDatabase
-import com.rosan.ruto.data.model.AiType
+import com.rosan.ruto.data.model.AiModel
 import com.rosan.ruto.data.model.ConversationModel
-import com.rosan.ruto.data.model.ConversationStatus
 import com.rosan.ruto.data.model.MessageModel
-import com.rosan.ruto.data.model.MessageSource
-import com.rosan.ruto.data.model.MessageType
+import com.rosan.ruto.data.model.ai_model.AiType
+import com.rosan.ruto.data.model.conversation.ConversationStatus
+import com.rosan.ruto.data.model.message.MessageSource
+import com.rosan.ruto.data.model.message.MessageType
 import com.rosan.ruto.retrofit.RetrofitHttpClientBuilderFactory
 import com.rosan.ruto.ruto.repo.RutoObserver
 import dev.langchain4j.data.message.AiMessage
 import dev.langchain4j.data.message.ChatMessage
-import dev.langchain4j.data.message.Content
 import dev.langchain4j.data.message.ImageContent
 import dev.langchain4j.data.message.SystemMessage
-import dev.langchain4j.data.message.TextContent
 import dev.langchain4j.data.message.UserMessage
 import dev.langchain4j.kotlin.model.chat.StreamingChatModelReply
 import dev.langchain4j.kotlin.model.chat.chatFlow
@@ -27,25 +26,29 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 class RutoResponder(database: AppDatabase) : RutoObserver {
     private val conversationDao = database.conversations()
 
     private val messageDao = database.messages()
+
+    private val aisDao = database.ais()
+
+    private val aiJobs = ConcurrentHashMap<Long, Job>()
 
     private var job: Job? = null
 
@@ -59,11 +62,24 @@ class RutoResponder(database: AppDatabase) : RutoObserver {
                 .mapNotNull { message ->
                     val conversation =
                         conversationDao.get(message.conversationId) ?: return@mapNotNull null
+                    if (conversation.status != ConversationStatus.WAITING) return@mapNotNull null
                     val messages = messageDao.all(message.conversationId)
                     conversation to messages
-                }.flatMapLatest { (conversation, messages) ->
-                    processAiResponse(conversation, messages)
-                }.collect()
+                }.collect { (conversation, messages) ->
+                    val convId = conversation.id
+
+                    aiJobs[convId]?.cancelAndJoin()
+
+                    aiJobs[convId] = scope.launch {
+                        try {
+                            processAiResponse(conversation, messages)
+                                .collect()
+                        } finally {
+                            if (aiJobs[convId] == coroutineContext[Job])
+                                aiJobs.remove(convId)
+                        }
+                    }
+                }
         }
     }
 
@@ -84,9 +100,15 @@ class RutoResponder(database: AppDatabase) : RutoObserver {
         )
         val aiMessageId = messageDao.add(aiMessage)
         val requestModel = buildStreamingChatModel(conversation)
-        val requestMessages = buildMessages(messages)
+        val requestMessages = buildMessages(conversation, messages)
 
         val statusFlow = conversationDao.observeStatus(conversation.id)
+        val lastUpdateAt = System.currentTimeMillis()
+        conversationDao.updateStatus(
+            conversation.id,
+            status = ConversationStatus.RUNNING,
+            updatedAt = lastUpdateAt
+        )
 
         return requestModel.chatFlow {
             messages(requestMessages)
@@ -94,8 +116,6 @@ class RutoResponder(database: AppDatabase) : RutoObserver {
             if (it is StreamingChatModelReply.PartialResponse) it.partialResponse else null
         }.filter {
             it.isNotEmpty()
-        }.onStart {
-            conversationDao.updateStatus(conversation.id, ConversationStatus.RUNNING)
         }.takeUntil(statusFlow.map { it != ConversationStatus.RUNNING }
         ).onEach { chunk ->
             messageDao.chunkToLast(aiMessageId, chunk)
@@ -109,79 +129,89 @@ class RutoResponder(database: AppDatabase) : RutoObserver {
                     ConversationStatus.ERROR
                 }
             }
-            conversationDao.updateStatus(conversation.id, status)
+            conversationDao.updateStatusSafely(
+                conversation.id,
+                status = status,
+                lastUpdateAt = lastUpdateAt
+            )
         }.onCompletion { cause ->
             if (cause != null) return@onCompletion
-            conversationDao.updateStatus(conversation.id, ConversationStatus.COMPLETED)
+            conversationDao.updateStatusSafely(
+                conversation.id,
+                status = ConversationStatus.COMPLETED,
+                lastUpdateAt = lastUpdateAt
+            )
         }
     }
 
-    private fun buildStreamingChatModel(conversation: ConversationModel): StreamingChatModel {
-        return when (conversation.aiType) {
-            AiType.OpenAI -> buildOpenAIStreamingChatModel(conversation)
+    private suspend fun buildStreamingChatModel(conversation: ConversationModel): StreamingChatModel {
+        val ai = aisDao.get(conversation.aiId)
+        return when (ai?.type) {
+            AiType.OPENAI -> buildOpenAIStreamingChatModel(ai, conversation)
+            else -> throw Exception("ai not found")
         }
     }
 
-    private fun buildOpenAIStreamingChatModel(conversation: ConversationModel): OpenAiStreamingChatModel {
-        return OpenAiStreamingChatModel.builder().baseUrl(conversation.hostUrl)
-            .modelName(conversation.modelId).apiKey(conversation.apiKey)
+    private fun buildOpenAIStreamingChatModel(
+        ai: AiModel,
+        conversation: ConversationModel
+    ): OpenAiStreamingChatModel {
+        return OpenAiStreamingChatModel.builder().baseUrl(ai.baseUrl)
+            .modelName(ai.modelId).apiKey(ai.apiKey)
             .httpClientBuilder(RetrofitHttpClientBuilderFactory().create()).build()
     }
 
-    private fun buildMessages(messages: List<MessageModel>): List<ChatMessage> {
-        return messages.fold(mutableListOf()) { acc, message ->
-            if (message.content.isEmpty()) return@fold acc
-            when (message.source to message.type) {
+    private fun buildMessages(
+        conversation: ConversationModel,
+        messages: List<MessageModel>
+    ): List<ChatMessage> {
+        // 如果是自动任务，就启动过滤，只要最后一张图
+        val lastImageIndex = if (conversation.displayId != null) {
+            messages.indexOfLast {
+                it.type == MessageType.IMAGE_PATH
+                        || it.type == MessageType.IMAGE_URL
+            }
+        } else null
+        return messages.foldIndexed(mutableListOf()) { index, acc, message ->
+            if (message.content.isEmpty()) return@foldIndexed acc
+            val current = when (message.source to message.type) {
                 MessageSource.SYSTEM to MessageType.TEXT -> SystemMessage.from(message.content)
                 MessageSource.AI to MessageType.TEXT -> AiMessage.from(message.content)
-                MessageSource.USER to MessageType.TEXT -> {
-                    val content = TextContent.from(message.content)
-                    val last = acc.lastOrNull() as? UserMessage
-                    if (last != null) {
-                        mutableListOf<Content>().also {
-                            it.addAll(last.contents())
-                            it.add(content)
-                        }
+                MessageSource.USER to MessageType.TEXT -> UserMessage.from(message.content)
+                MessageSource.USER to MessageType.IMAGE_PATH -> {
+                    if (lastImageIndex != null && lastImageIndex != index) {
                         null
-                    } else UserMessage.from(content)
+                    } else {
+                        val path = message.content
+                        val file = File(path)
+                        val bytes = file.inputStream().buffered().use { it.readBytes() }
+                        val options = BitmapFactory.Options()
+                        options.inJustDecodeBounds = true
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+
+                        val mimeType = options.outMimeType ?: "image/jpeg"
+                        val base64String = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        UserMessage.from(ImageContent(base64String, mimeType))
+                    }
                 }
 
                 MessageSource.USER to MessageType.IMAGE_URL -> {
-                    val content = ImageContent.from(message.content)
-                    val last = acc.lastOrNull() as? UserMessage
-                    if (last != null) {
-                        mutableListOf<Content>().also {
-                            it.addAll(last.contents())
-                            it.add(content)
-                        }
+                    if (lastImageIndex != null && lastImageIndex != index) {
                         null
-                    } else UserMessage.from(content)
-                }
-
-                MessageSource.USER to MessageType.IMAGE_PATH -> {
-                    val path = message.content
-                    val file = File(path)
-                    val bytes = file.inputStream().buffered().use { it.readBytes() }
-                    val options = BitmapFactory.Options()
-                    options.inJustDecodeBounds = true
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-
-                    val mimeType = options.outMimeType
-                    val base64String = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                    val content = ImageContent(base64String, mimeType)
-                    val last = acc.lastOrNull() as? UserMessage
-                    if (last != null) {
-                        mutableListOf<Content>().also {
-                            it.addAll(last.contents())
-                            it.add(content)
-                        }
-                        null
-                    } else UserMessage.from(content)
+                    } else UserMessage.from(ImageContent(message.content))
                 }
 
                 else -> null
-            }?.let {
-                acc.add(it)
+            } ?: return@foldIndexed acc
+            val previous = acc.lastOrNull()
+            if (current is UserMessage && previous is UserMessage) {
+                acc.removeLastOrNull()
+                val combinedContents = previous.contents().toMutableList().apply {
+                    addAll(current.contents())
+                }
+                acc.add(UserMessage.from(combinedContents))
+            } else {
+                acc.add(current)
             }
             acc
         }
