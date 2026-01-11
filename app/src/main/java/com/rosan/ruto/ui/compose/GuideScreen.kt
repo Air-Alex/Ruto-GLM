@@ -41,7 +41,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,7 +65,6 @@ import com.rosan.ruto.service.KeepAliveService
 import com.rosan.ruto.ui.Destinations
 import com.rosan.ruto.util.PermissionProvider
 import com.rosan.ruto.util.SettingsManager
-import kotlinx.coroutines.launch
 import org.koin.compose.currentKoinScope
 
 private sealed interface GuideUiState {
@@ -237,13 +235,19 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                                             )
                                             Column(modifier = Modifier.padding(start = 16.dp)) {
                                                 Text(
-                                                    text = provider.name,
+                                                    text = when (provider) {
+                                                        PermissionProvider.SHIZUKU -> "Shizuku"
+                                                        PermissionProvider.SHIZUKU_TERMINAL -> "Shizuku Terminal"
+                                                        PermissionProvider.ROOT -> "Root"
+                                                        PermissionProvider.TERMINAL -> "Terminal"
+                                                    },
                                                     style = MaterialTheme.typography.titleMedium,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 Text(
                                                     text = when (provider) {
                                                         PermissionProvider.SHIZUKU -> "Requires Shizuku app"
+                                                        PermissionProvider.SHIZUKU_TERMINAL -> "Shizuku with terminal fallback"
                                                         PermissionProvider.ROOT -> "Legacy root access"
                                                         PermissionProvider.TERMINAL -> "Manual shell execution"
                                                     },
@@ -282,33 +286,13 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                                     .height(56.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 onClick = {
-                                    when (selectedProvider) {
-                                        PermissionProvider.SHIZUKU -> {
-                                            SettingsManager.savePermissionProvider(context, PermissionProvider.SHIZUKU)
-                                            uiState = GuideUiState.Loading
-                                        }
-
-                                        PermissionProvider.TERMINAL -> {
-                                            isShellError = shell.isBlank()
-                                            if (!isShellError) {
-                                                SettingsManager.savePermissionProvider(
-                                                    context,
-                                                    PermissionProvider.TERMINAL,
-                                                    shell
-                                                )
-                                                uiState = GuideUiState.Loading
-                                            }
-                                        }
-
-                                        PermissionProvider.ROOT -> {
-                                            SettingsManager.savePermissionProvider(
-                                                context,
-                                                PermissionProvider.ROOT
-                                            )
-                                            uiState = GuideUiState.Loading
-                                        }
-
-                                        null -> {}
+                                    if (selectedProvider != null) {
+                                        SettingsManager.savePermissionProvider(
+                                            context,
+                                            selectedProvider!!,
+                                            if (selectedProvider == PermissionProvider.TERMINAL) shell else null
+                                        )
+                                        uiState = GuideUiState.Loading
                                     }
                                 },
                                 enabled = selectedProvider != null
@@ -328,6 +312,7 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                             Text(
                                 text = when (state.provider) {
                                     PermissionProvider.SHIZUKU -> "Shizuku Service Needed"
+                                    PermissionProvider.SHIZUKU_TERMINAL -> "Shizuku Terminal Needed"
                                     PermissionProvider.ROOT -> "Root Access Needed"
                                     PermissionProvider.TERMINAL -> "Terminal Config Needed"
                                 },
@@ -356,6 +341,7 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                                 Text(
                                     text = when (state.provider) {
                                         PermissionProvider.SHIZUKU -> "Grant Shizuku Permission"
+                                        PermissionProvider.SHIZUKU_TERMINAL -> "Grant Shizuku Permission"
                                         PermissionProvider.ROOT -> "Grant Root Permission"
                                         PermissionProvider.TERMINAL -> "Retry Terminal Connection"
                                     },

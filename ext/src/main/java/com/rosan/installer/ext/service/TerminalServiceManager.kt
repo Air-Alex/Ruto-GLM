@@ -16,7 +16,7 @@ import java.util.StringTokenizer
 
 class TerminalServiceManager(private val context: Context, val shell: String) : ServiceManager,
     KoinComponent {
-    private val terminalLoader = SuspendLazy<AppProcess.Terminal> {
+    private val terminalLoader = SuspendLazy<AppProcess> {
         val command = mutableListOf<String>()
         val st = StringTokenizer(shell)
         while (st.hasMoreTokens()) command.add(st.nextToken())

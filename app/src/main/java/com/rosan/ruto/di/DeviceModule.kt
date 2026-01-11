@@ -3,6 +3,7 @@ package com.rosan.ruto.di
 import android.content.Context
 import android.util.Log
 import com.rosan.installer.ext.service.ShizukuServiceManager
+import com.rosan.installer.ext.service.ShizukuTerminalServiceManager
 import com.rosan.installer.ext.service.TerminalServiceManager
 import com.rosan.ruto.device.DeviceManager
 import com.rosan.ruto.util.PermissionProvider
@@ -24,6 +25,7 @@ val deviceModule = module {
             val sm = dev.serviceManager
             when (provider) {
                 PermissionProvider.SHIZUKU -> sm is ShizukuServiceManager
+                PermissionProvider.SHIZUKU_TERMINAL -> sm is ShizukuTerminalServiceManager
                 PermissionProvider.TERMINAL, PermissionProvider.ROOT -> {
                     val targetShell = if (provider == PermissionProvider.ROOT) "su"
                     else SettingsManager.getTerminalShell(context)
@@ -49,6 +51,7 @@ val deviceModule = module {
             // 根据 Provider 创建新的 ServiceManager
             val newServiceManager = when (provider) {
                 PermissionProvider.SHIZUKU -> ShizukuServiceManager(context)
+                PermissionProvider.SHIZUKU_TERMINAL -> ShizukuTerminalServiceManager(context)
                 else -> {
                     val shell = if (provider == PermissionProvider.ROOT) "su"
                     else SettingsManager.getTerminalShell(context)
